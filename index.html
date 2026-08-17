@@ -610,22 +610,22 @@
 // (Projekteinstellungen → Allgemein → "SDK-Setup und Konfiguration") eintragen.
 // =========================================================================
 const firebaseConfig = {
-  apiKey: "DEIN_API_KEY",
-  authDomain: "DEIN_PROJEKT.firebaseapp.com",
-  projectId: "DEIN_PROJEKT",
-  storageBucket: "DEIN_PROJEKT.appspot.com",
-  messagingSenderId: "DEINE_SENDER_ID",
-  appId: "DEINE_APP_ID"
+  apiKey: "AIzaSyBTkR5cfPPWuNzLqrzsJaLNr6VWoiF2scA",
+  authDomain: "gefrierschrank-a7bb3.firebaseapp.com",
+  projectId: "gefrierschrank-a7bb3",
+  storageBucket: "gefrierschrank-a7bb3.firebasestorage.app",
+  messagingSenderId: "872271519193",
+  appId: "1:872271519193:web:a5ca2c2560ea1610d00dc8"
 };
 // =========================================================================
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
 import {
   getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 import {
   getFirestore, doc, onSnapshot, setDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
