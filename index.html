@@ -166,14 +166,6 @@
     border-bottom-right-radius:22px;
     box-shadow:0 6px 20px rgba(27,74,100,0.25);
   }
-  header .eyebrow{
-    font-size:11.5px;
-    letter-spacing:.14em;
-    text-transform:uppercase;
-    opacity:.75;
-    font-weight:600;
-    margin-bottom:4px;
-  }
   .header-row{
     display:flex;
     align-items:flex-start;
@@ -193,17 +185,43 @@
     flex-shrink:0;
     margin-top:2px;
   }
-  .header-icons button{
-    width:30px; height:30px;
+  .menu-wrap{ position:relative; }
+  #menuBtn{
+    width:34px; height:30px;
     border-radius:9px;
     border:1px solid rgba(255,255,255,.25);
     background:rgba(255,255,255,.12);
     color:#fff;
-    font-size:13px;
+    font-size:16px;
     display:flex; align-items:center; justify-content:center;
     font-family:inherit;
   }
-  .header-icons button:active{ background:rgba(255,255,255,.25); }
+  #menuBtn:active{ background:rgba(255,255,255,.25); }
+  .menu-dropdown{
+    position:absolute;
+    top:38px; right:0;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:12px;
+    box-shadow:0 10px 28px rgba(0,0,0,.18);
+    padding:6px;
+    min-width:170px;
+    display:none;
+    flex-direction:column;
+    z-index:8;
+  }
+  .menu-dropdown.open{ display:flex; }
+  .menu-dropdown button{
+    text-align:left;
+    padding:10px 12px;
+    border:none;
+    background:transparent;
+    color:var(--ink);
+    font-size:13.5px;
+    font-family:inherit;
+    border-radius:8px;
+  }
+  .menu-dropdown button:active{ background:var(--surface-2); }
   header .sub{
     margin-top:6px;
     font-size:13px;
@@ -432,18 +450,6 @@
     font-weight:700;
     font-variant-numeric:tabular-nums;
   }
-  .remove-btn{
-    width:30px; height:30px;
-    border-radius:9px;
-    border:1px solid var(--border);
-    background:#fff;
-    color:var(--berry);
-    font-size:14px;
-    font-family:inherit;
-    display:flex; align-items:center; justify-content:center;
-    flex-shrink:0;
-  }
-  .remove-btn:active{ background:#F7E9E8; }
 
   .fab{
     position:fixed;
@@ -570,16 +576,20 @@
 <!-- ================= APP ================= -->
 <div id="appRoot">
   <header>
-    <div class="eyebrow">Frostbestand · gemeinsam verwaltet</div>
     <div class="header-row">
       <h1>Gefrierschrank</h1>
       <div class="header-icons">
-        <button id="exportBtn" title="Export als JSON" aria-label="Export als JSON">⬇</button>
-        <button id="importBtn" title="Import aus JSON" aria-label="Import aus JSON">⬆</button>
-        <button id="logoutBtn" title="Abmelden" aria-label="Abmelden">⎋</button>
+        <div class="menu-wrap">
+          <button id="menuBtn" title="Menü" aria-label="Menü">⋮</button>
+          <div class="menu-dropdown" id="menuDropdown">
+            <button id="exportBtn">⬇ Export (JSON)</button>
+            <button id="importBtn">⬆ Import (JSON)</button>
+            <button id="logoutBtn">⎋ Abmelden</button>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="sub"><span class="sync-dot" id="syncDot"></span><span id="syncText">wird verbunden…</span></div>
+    <div class="sub"><span class="sync-dot" id="syncDot"></span><span id="syncText">Verbinde…</span></div>
   </header>
 
   <main>
@@ -699,7 +709,7 @@ const AGE_THRESHOLDS = {
 };
 
 let items = [];
-let collapsedCats = new Set();
+let collapsedCats = new Set(CATEGORIES.map(c => c.id)); // alle Kategorien starten eingeklappt für schnellen Überblick
 let lastSyncedString = null;
 let searchTerm = "";
 let unsubscribeSnapshot = null;
@@ -755,13 +765,13 @@ function setSyncStatus(state){
   const text = $("#syncText");
   if(state === "live"){
     dot.classList.remove("offline");
-    text.textContent = "live verbunden";
+    text.textContent = "Live";
   } else if(state === "offline"){
     dot.classList.add("offline");
-    text.textContent = "Verbindung getrennt";
+    text.textContent = "Offline";
   } else {
     dot.classList.remove("offline");
-    text.textContent = "wird verbunden…";
+    text.textContent = "Verbinde…";
   }
 }
 
@@ -865,23 +875,39 @@ function render(){
           <div class="item-name">${escapeHtml(item.name)}</div>
           <div class="item-meta ${cls}">
             <span class="age-dot"></span>
-            <span>${formatDateDE(item.freezeDate)}</span>
-            <span class="dot-sep">·</span>
             <span class="age-text">${daysLabel}</span>
             <span class="dot-sep">·</span>
             <select class="shelf-select" data-act="shelf">${shelfOptions}</select>
           </div>
         </div>
         <div class="stepper">
-          <button data-act="dec">−</button>
+          <button data-act="dec" title="Tippen: -1 · Gedrückt halten: löschen">−</button>
           <span class="qty">${item.qty}</span>
           <button data-act="inc">+</button>
         </div>
-        <button class="remove-btn" data-act="del">✕</button>
       `;
       row.querySelector('[data-act="inc"]').addEventListener("click", () => changeQty(item.id, 1));
-      row.querySelector('[data-act="dec"]').addEventListener("click", () => changeQty(item.id, -1));
-      row.querySelector('[data-act="del"]').addEventListener("click", () => removeItem(item.id));
+
+      // "−" = Menge verringern; gedrückt halten (≈600ms) = Artikel direkt löschen (ersetzt separaten Löschen-Button)
+      const decBtn = row.querySelector('[data-act="dec"]');
+      let pressTimer = null;
+      let longPressFired = false;
+      const clearPress = () => { clearTimeout(pressTimer); pressTimer = null; };
+      decBtn.addEventListener("pointerdown", () => {
+        longPressFired = false;
+        pressTimer = setTimeout(() => {
+          longPressFired = true;
+          removeItem(item.id);
+          showToast("Entfernt: " + item.name);
+        }, 600);
+      });
+      decBtn.addEventListener("pointerup", () => {
+        clearPress();
+        if(!longPressFired) changeQty(item.id, -1);
+      });
+      decBtn.addEventListener("pointerleave", clearPress);
+      decBtn.addEventListener("pointercancel", clearPress);
+
       row.querySelector('[data-act="shelf"]').addEventListener("click", (e) => e.stopPropagation());
       row.querySelector('[data-act="shelf"]').addEventListener("change", (e) => changeShelf(item.id, e.target.value));
       list.appendChild(row);
@@ -1053,8 +1079,19 @@ async function importItems(file){
   showToast(imported.length + " Artikel importiert");
 }
 
-$("#exportBtn").addEventListener("click", exportItems);
-$("#importBtn").addEventListener("click", () => $("#importFile").click());
+$("#menuBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  $("#menuDropdown").classList.toggle("open");
+});
+document.addEventListener("click", (e) => {
+  const dropdown = $("#menuDropdown");
+  if(dropdown.classList.contains("open") && !dropdown.contains(e.target) && e.target.id !== "menuBtn"){
+    dropdown.classList.remove("open");
+  }
+});
+
+$("#exportBtn").addEventListener("click", () => { $("#menuDropdown").classList.remove("open"); exportItems(); });
+$("#importBtn").addEventListener("click", () => { $("#menuDropdown").classList.remove("open"); $("#importFile").click(); });
 $("#importFile").addEventListener("change", (e) => {
   const file = e.target.files[0];
   if(file) importItems(file);
@@ -1096,6 +1133,7 @@ authForm.addEventListener("submit", async (e) => {
 });
 
 $("#logoutBtn").addEventListener("click", async () => {
+  $("#menuDropdown").classList.remove("open");
   stopFirestoreListener();
   await signOut(auth);
 });
